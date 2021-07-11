@@ -19,6 +19,7 @@ cap = cv2.VideoCapture(0)
 cap.set(3, SCREEN_WIDTH)
 cap.set(4, SCREEN_HEIGHT)
 
+
 p_time = 0
 
 hand_detector = htm.HandDetector(min_detection_confidence=0.6)
@@ -95,4 +96,8 @@ while True:
 
     cv2.imshow("Image", img)
 
-    cv2.waitKey(1)
+    if cv2.waitKey(1) ==ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
