@@ -3,6 +3,7 @@ import time
 import numpy as np
 
 import module.HandTrackingModule as htm
+import module.PainterMenu as PM
 
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
@@ -20,6 +21,10 @@ cap.set(3, SCREEN_WIDTH)
 cap.set(4, SCREEN_HEIGHT)
 
 
+menu_item_paths = ['assets/brush.png', 'assets/thickness.png',
+                   'assets/palette.png', 'assets/eraser.png', 'assets/hand.png']
+menu = PM.Menu(cv2, menu_item_paths, width=SCREEN_WIDTH, height=SCREEN_HEIGHT)
+
 p_time = 0
 
 hand_detector = htm.HandDetector(min_detection_confidence=0.6)
@@ -33,12 +38,19 @@ xp, yp = -1, -1
 
 img_canvas = np.zeros((SCREEN_HEIGHT, SCREEN_WIDTH, 3), np.uint8)
 
+
+
 while True:
     success, img = cap.read()
     img = cv2.flip(img, 1)
 
     drawing_color = c7
     erase_color = (0, 0, 0)
+
+    # draw menu
+    menu.draw(cv2, img)
+
+
     # 0. Find Hand Landmarks
     img, positions = hand_detector.find_hand(img)
     # print("imgshape", img.shape)
@@ -92,7 +104,7 @@ while True:
     fps = 1 / (c_time - p_time)
     p_time = c_time
 
-    cv2.putText(img, f'FPS: {int(fps)}', (20, 20), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, c4, 2)
+    cv2.putText(img, f'FPS: {int(fps)}', (SCREEN_WIDTH-100, 20), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, c4, 2)
 
     cv2.imshow("Image", img)
 
