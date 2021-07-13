@@ -4,6 +4,7 @@ import numpy as np
 
 import module.HandTrackingModule as htm
 import module.PainterMenu as PM
+import math
 
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
@@ -16,29 +17,47 @@ c5 = (186, 186, 12)
 c6 = (0, 78, 255)
 c7 = (220, 153, 232)
 
+green = (164, 245, 66)
+red = (66, 66, 245)
+yellow = (66, 242, 245)
+blue = (245, 176, 66)
+purple = (245, 66, 78)
+
 cap = cv2.VideoCapture(0)
 cap.set(3, SCREEN_WIDTH)
 cap.set(4, SCREEN_HEIGHT)
 
+menu_items = [
+    ('Brush', 'assets/brush.png', PM.MenuMode.paint),
+    ('Thickness', 'assets/thickness.png', PM.MenuMode.thickness),
+    ('Color', 'assets/palette.png', PM.MenuMode.color),
+    ('Eraser', 'assets/eraser.png', PM.MenuMode.eraser),
+    ('Hand', 'assets/hand.png', PM.MenuMode.hand)
+]
 
-menu_item_paths = ['assets/brush.png', 'assets/thickness.png',
-                   'assets/palette.png', 'assets/eraser.png', 'assets/hand.png']
-menu = PM.Menu(cv2, menu_item_paths, width=SCREEN_WIDTH, height=SCREEN_HEIGHT)
+menu = PM.Menu(cv2, menu_items, width=SCREEN_WIDTH, height=SCREEN_HEIGHT)
 
 p_time = 0
 
 hand_detector = htm.HandDetector(min_detection_confidence=0.6)
 
-pen_tip = 8
-hold_tip = 12
-eraser_tip = 16
-BRUSH_THICKNESS = 15
+PRIMARY_HAND_ID = 0
+THUMB_TIP = 4
+INDEX_TIP = 8
+MIDDLE_TIP = 12
+RING_TIP = 16
+
 ERASER_THICKNESS = 20
+
+MAX_BRUSH_THICKNESS = 30
+MIN_BRUSH_THICKNESS = 1
+DEFAULT_BRUSH_THICKNESS = 15
+
+current_brush_thickness = DEFAULT_BRUSH_THICKNESS
+
 xp, yp = -1, -1
 
 img_canvas = np.zeros((SCREEN_HEIGHT, SCREEN_WIDTH, 3), np.uint8)
-
-
 
 while True:
     success, img = cap.read()
@@ -49,7 +68,7 @@ while True:
 
     # draw menu
     menu.draw(cv2, img)
-
+    selected_menu_item = menu.current_item
 
     # 0. Find Hand Landmarks
     img, positions = hand_detector.find_hand(img)
@@ -57,41 +76,67 @@ while True:
     # print("canvasshape", img_canvas.shape)
 
     if len(positions) > 0:
-        pen_x, pen_y = positions[0][pen_tip][1:]
-        hold_x, hold_y = positions[0][hold_tip][1:]
-        eraser_x, eraser_y = positions[0][eraser_tip][1:]
+        primary_hand = positions[PRIMARY_HAND_ID]
+
+        thumb_x, thumb_y = primary_hand[THUMB_TIP][1:]
+        index_finger_x, index_finger_y = primary_hand[INDEX_TIP][1:]
+        middle_finger_x, middle_finger_y = primary_hand[MIDDLE_TIP][1:]
+        ring_finger_x, ring_finger_y = primary_hand[RING_TIP][1:]
 
         # 1. drawing mode : index finger is up
         up_fingers = hand_detector.fingers_state()
 
-        if len(up_fingers) == 5 and up_fingers[4] == False:
-            if up_fingers[1] and up_fingers[2] and up_fingers[3]:
+        if len(up_fingers) == 5 and ~up_fingers[4]:
+
+            if selected_menu_item.mode == PM.MenuMode.thickness:
+                cx, cy = (thumb_x + index_finger_x) // 2, (thumb_y + index_finger_y) // 2
+
+                cv2.line(img, (thumb_x, thumb_y), (index_finger_x, index_finger_y), purple, 2)
+
+                cv2.circle(img, (thumb_x, thumb_y), 5, red, cv2.FILLED)
+                cv2.circle(img, (index_finger_x, index_finger_y), 5, red, cv2.FILLED)
+
+                length = math.hypot(index_finger_x - thumb_x, index_finger_y - thumb_y)
+
+                cv2.circle(img, (cx, cy), 5, yellow if length > 50 else blue, cv2.FILLED)
+
+            if selected_menu_item.mode == PM.MenuMode.eraser and up_fingers[1] and up_fingers[2] and up_fingers[3]:
                 # erase mode
-                cx, cy = hold_x, hold_y
-                cv2.circle(img, (cx, cy), 60, c4, cv2.FILLED)
+                # menu.select_by_mode(PM.MenuMode.eraser, cv2)
+                cx, cy = middle_finger_x, middle_finger_y
+                cv2.circle(img, (cx, cy), ERASER_THICKNESS, c4, cv2.FILLED)
 
                 if xp == -1 and yp == -1:
                     xp, yp = cx, cy
 
-                cv2.circle(img, (cx, cy), 60, erase_color, cv2.FILLED)
-                cv2.circle(img_canvas, (cx, cy), 60, erase_color, cv2.FILLED)
+                cv2.circle(img, (cx, cy), ERASER_THICKNESS, erase_color, cv2.FILLED)
+                cv2.circle(img_canvas, (cx, cy), ERASER_THICKNESS, erase_color, cv2.FILLED)
 
             elif up_fingers[1] and up_fingers[2]:
                 # hold mode
-                cx, cy = pen_x + (hold_x - pen_x) // 2, pen_y
+                # menu.select_by_mode(PM.MenuMode.hand, cv2)
+                cx, cy = index_finger_x + (middle_finger_x - index_finger_x) // 2, index_finger_y
                 xp, yp = -1, -1
-                cv2.circle(img, (cx, cy), 20, c2, cv2.FILLED)
+                # cv2.circle(img, (cx, cy), 20, c2, cv2.FILLED)
 
-            elif up_fingers[1]:
+                selected_menu_item = menu.select_menu_item_if_possible(cv2, (middle_finger_x, middle_finger_y))
+                menu.select_by_mode(selected_menu_item.mode, cv2)
+
+                cv2.putText(img, f'X: {int(cx)}', (SCREEN_WIDTH - 350, 100), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, c4,
+                            2)
+                cv2.putText(img, f'Y: {int(cy)}', (SCREEN_WIDTH - 250, 100), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, c4,
+                            2)
+
+            elif selected_menu_item.mode == PM.MenuMode.paint and up_fingers[1]:
                 # draw mode
-                cx, cy = pen_x, pen_y
+                cx, cy = index_finger_x, index_finger_y
                 cv2.circle(img, (cx, cy), 10, drawing_color, cv2.FILLED)
 
                 if xp == -1 and yp == -1:
                     xp, yp = cx, cy
 
-                cv2.line(img, (xp, yp), (cx, cy), drawing_color, BRUSH_THICKNESS)
-                cv2.line(img_canvas, (xp, yp), (cx, cy), drawing_color, BRUSH_THICKNESS)
+                cv2.line(img, (xp, yp), (cx, cy), drawing_color,current_brush_thickness)
+                cv2.line(img_canvas, (xp, yp), (cx, cy), drawing_color,current_brush_thickness)
                 xp, yp = cx, cy
 
     img_gray = cv2.cvtColor(img_canvas, cv2.COLOR_BGR2GRAY)
@@ -104,11 +149,13 @@ while True:
     fps = 1 / (c_time - p_time)
     p_time = c_time
 
-    cv2.putText(img, f'FPS: {int(fps)}', (SCREEN_WIDTH-100, 20), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, c4, 2)
+    cv2.putText(img, f'FPS: {int(fps)}', (SCREEN_WIDTH - 100, 20), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, c4, 2)
+
+    # cv2.putText(img, f'Mode: {selected_menu_item.title}', (SCREEN_WIDTH - 250, 50), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, c4, 2)
 
     cv2.imshow("Image", img)
 
-    if cv2.waitKey(1) ==ord('q'):
+    if cv2.waitKey(1) == ord('q'):
         break
 
 cap.release()

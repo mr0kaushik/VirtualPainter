@@ -1,63 +1,63 @@
 import cv2 as cv
 import numpy as np
+import enum
+
+
+class MenuMode(enum.Enum):
+    paint = 0
+    thickness = 1
+    color = 2
+    eraser = 3
+    hand = 4
 
 
 class Menu:
 
-    def __init__(self, cv2, paths=[], width=500, height=100):
+    def __init__(self, cv2, items=[], width=500, height=100):
         self.MENU_WIDTH = width
         self.MENU_HEIGHT = height
         self.MENU_ITEM_WIDTH = 48
-        self.SELECTED_COLOR = [253, 159, 0]
-        self.UN_SELECTED_COLOR = [0, 0, 0]
+        self.SELECTED_COLOR = [253, 159, 0, 255]
+        self.UNSELECTED_COLOR = [0, 0, 0, 255]
         self.BORDER_WIDTH = 3
         self.ITEM_MARGIN_HEIGHT = 15
         self.ITEM_MARGIN_WIDTH = 50
 
-        self.itemCount = len(paths)
+        self.itemCount = len(items)
 
         item_size = (self.MENU_ITEM_WIDTH, self.MENU_ITEM_WIDTH)
 
         self.menuItems = []
+        for idx, val in enumerate(items):
+            top_left = ((idx * self.MENU_ITEM_WIDTH + (idx + 1) * self.ITEM_MARGIN_WIDTH), self.ITEM_MARGIN_HEIGHT)
+            bottom_right = (top_left[0] + self.MENU_ITEM_WIDTH, top_left[1] + self.MENU_ITEM_WIDTH)
+            self.menuItems.append(MenuItem(val, cv2, (top_left, bottom_right), size=item_size))
 
-        for idx, path in enumerate(paths):
-            self.menuItems.append(MenuItem(cv2, path,
-                                           (idx * self.MENU_ITEM_WIDTH + (idx + 1) * self.ITEM_MARGIN_WIDTH, self.ITEM_MARGIN_HEIGHT),
-                                           size=item_size))
-        #
-        # self.menuItems = [
-        #     MenuItem(cv2, '../assets/brush.png',
-        #              (self.ITEM_MARGIN, self.ITEM_MARGIN), size=item_size),  # brush
-        #     MenuItem(cv2, '../assets/thickness.png',
-        #              (self.MENU_ITEM_WIDTH + 2 * self.ITEM_MARGIN, self.ITEM_MARGIN), size=item_size),  # thickness
-        #     MenuItem(cv2, '../assets/palette.png',
-        #              (2 * self.MENU_ITEM_WIDTH + 3 * self.ITEM_MARGIN, self.ITEM_MARGIN), size=item_size),  # color
-        #     MenuItem(cv2, '../assets/eraser.png',
-        #              (3 * self.MENU_ITEM_WIDTH + 4 * self.ITEM_MARGIN, self.ITEM_MARGIN), size=item_size),  # eraser
-        #     MenuItem(cv2, '../assets/hand.png',
-        #              (4 * self.MENU_ITEM_WIDTH + 5 * self.ITEM_MARGIN, self.ITEM_MARGIN), size=item_size),  # hand
-        # ]
         self.selectedMenuItemIndex = 0
+        self.current_item = self.menuItems[self.selectedMenuItemIndex]
         self.selectedImage = self.menuItems[self.selectedMenuItemIndex].img
         self.select(self.selectedMenuItemIndex, cv2)
 
     def select(self, index, cv2):
         self.selectedImage = self.removeBorder(cv2, self.selectedImage)
         self.selectedMenuItemIndex = index
+        self.current_item = self.menuItems[index]
         self.selectedImage = self.menuItems[self.selectedMenuItemIndex].img
         self.selectedImage = self.drawBorder(cv2, self.selectedImage)
+        mask = np.all(self.selectedImage == self.UNSELECTED_COLOR, axis=-1)
+        self.selectedImage[mask] = self.SELECTED_COLOR
 
     def drawBorder(self, cv2, img):
         img = cv2.copyMakeBorder(img, self.BORDER_WIDTH, self.BORDER_WIDTH, self.BORDER_WIDTH,
                                  self.BORDER_WIDTH, cv2.BORDER_CONSTANT, value=self.SELECTED_COLOR)
-        mask = np.all(img == self.UN_SELECTED_COLOR, axis=-1)
+        mask = np.all(img == self.UNSELECTED_COLOR, axis=-1)
         img[mask] = self.SELECTED_COLOR
         return img
 
     def removeBorder(self, cv2, img):
         img = cv2.copyMakeBorder(img, 0, 0, 0, 0, cv2.BORDER_CONSTANT, value=self.SELECTED_COLOR)
         mask = np.all(img == self.SELECTED_COLOR, axis=-1)
-        img[mask] = self.UN_SELECTED_COLOR
+        img[mask] = self.UNSELECTED_COLOR
         # img[np.all(im == self.SELECTED_COLOR), axi]
         return img
 
@@ -65,64 +65,69 @@ class Menu:
         # img = np.zeros([self.MENU_HEIGHT, self.MENU_WIDTH, 3])
         masked_img = img
         for idx, item in enumerate(self.menuItems):
-            # if idx == self.selectedMenuItemIndex:
-            #     item.img = self.drawBorder(cv2, item.img)
-            masked_img = self.overlay_transparent(masked_img, item.img, item.position[0], item.position[1])
+            if idx == self.selectedMenuItemIndex:
+                masked_img = self.transparent_overlay(masked_img, self.selectedImage, pos=item.hit_box[0])
+            else:
+                masked_img = self.transparent_overlay(masked_img, item.img, pos=item.hit_box[0])
 
         return masked_img
 
+    def select_menu_item_if_possible(self, cv2, current_position):
+        for idx, item in enumerate(self.menuItems):
+            if item.is_inside(current_position):
+                print(f'Selected Index {idx}')
+                self.select(self.selectedMenuItemIndex, cv2)
+                return item
+        return self.current_item
 
-    # https://stackoverflow.com/questions/14063070/overlay-a-smaller-image-on-a-larger-image-python-opencv
-    def overlay_transparent(self, background, overlay, x, y):
-        background_width = background.shape[1]
-        background_height = background.shape[0]
+    def select_by_mode(self, mode: MenuMode, cv2):
+        self.select(mode.value, cv2)
 
-        if x >= background_width or y >= background_height:
-            return background
+    @staticmethod
+    def transparent_overlay(src, overlay, pos=(0, 0), scale=1):
+        # overlay = cv2.resize(overlay, (0, 0), fx=scale, fy=scale)
+        h, w, _ = overlay.shape  # Size of overlay
+        rows, cols, _ = src.shape  # Size of background Image
+        y, x = pos[0], pos[1]  # Position of foreground/overlay image
 
-        h, w = overlay.shape[0], overlay.shape[1]
-
-        if x + w > background_width:
-            w = background_width - x
-            overlay = overlay[:, :w]
-
-        if y + h > background_height:
-            h = background_height - y
-            overlay = overlay[:h]
-
-        if overlay.shape[2] < 4:
-            overlay = np.concatenate(
-                [
-                    overlay,
-                    np.ones((overlay.shape[0], overlay.shape[1], 1), dtype=overlay.dtype) * 255
-                ],
-                axis=2,
-            )
-
-        overlay_image = overlay[..., :3]
-        mask = overlay[..., 3:] / 255.0
-
-        background[y:y + h, x:x + w] = (1.0 - mask) * background[y:y + h, x:x + w] + mask * overlay_image
-
-        return background
+        for i in range(h):
+            for j in range(w):
+                if x + i >= rows or y + j >= cols:
+                    continue
+                alpha = float(overlay[i][j][3] / 255.0)  # read the alpha channel
+                src[x + i][y + j] = alpha * overlay[i][j][:3] + (1 - alpha) * src[x + i][y + j]
+        return src
 
 
 class MenuItem:
 
-    def __init__(self, cv2, path, position, size):
-        self.img = cv2.imread(path)
-        print(self.img.shape)
-        self.position = position
+    def __init__(self, data, cv2, hit_box, size):
+        self.title = data[0]
+        self.mode = data[2]
+        self.img = cv2.imread(data[1], cv2.IMREAD_UNCHANGED)
+        self.hit_box = hit_box  # (top_left_position, bottom_right_position)
         self.size = size
         self.img = cv2.resize(self.img, self.size, interpolation=cv2.INTER_AREA)
+        print(f'Image shape {self.img.shape}')
+
+    def is_inside(self, pos):
+        x1, y1 = self.hit_box[0]
+        x2, y2 = self.hit_box[1]
+
+        return (x1 < pos[0] < x2) and (y1 < pos[1] < y2)
 
 
 def main():
     cap = cv.VideoCapture(0, cv.CAP_DSHOW)
 
-    menu_item_paths = ['../assets/brush.png', '../assets/thickness.png',
-                       '../assets/palette.png', '../assets/eraser.png', '../assets/hand.png']
-    menu = Menu(cv, paths=menu_item_paths)
+    menu_item_paths = [
+        ('Brush', '../assets/brush.png', MenuMode.paint),
+        ('Thickness', '../assets/thickness.png', MenuMode.thickness),
+        ('Color', '../assets/palette.png', MenuMode.color),
+        ('Eraser', '../assets/eraser.png', MenuMode.eraser),
+        ('Hand', '../assets/hand.png', MenuMode.hand)
+    ]
+    menu = Menu(cv, items=menu_item_paths)
 
     while True:
         success, img = cap.read()
