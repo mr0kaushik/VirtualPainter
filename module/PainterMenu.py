@@ -11,7 +11,9 @@ class Menu:
         self.SELECTED_COLOR = [253, 159, 0]
         self.UN_SELECTED_COLOR = [0, 0, 0]
         self.BORDER_WIDTH = 3
-        self.ITEM_MARGIN = 10
+        self.ITEM_MARGIN_HEIGHT = 15
+        self.ITEM_MARGIN_WIDTH = 50
+
         self.itemCount = len(paths)
 
         item_size = (self.MENU_ITEM_WIDTH, self.MENU_ITEM_WIDTH)
@@ -20,7 +22,7 @@ class Menu:
 
         for idx, path in enumerate(paths):
             self.menuItems.append(MenuItem(cv2, path,
-                                           (idx * self.MENU_ITEM_WIDTH + (idx + 1) * self.ITEM_MARGIN, self.ITEM_MARGIN),
+                                           (idx * self.MENU_ITEM_WIDTH + (idx + 1) * self.ITEM_MARGIN_WIDTH, self.ITEM_MARGIN_HEIGHT),
                                            size=item_size))
         #
         # self.menuItems = [
