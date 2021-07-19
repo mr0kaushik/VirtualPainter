@@ -69,10 +69,10 @@ class HandDetector:
                     self.mpDraw.draw_landmarks(img, handLMS, self.mpHands.HAND_CONNECTIONS)
         return img, self.hand_list
 
-    def fingers_state(self):
+    def fingers_state(self, hand_id=0):
         fingers = []
         if len(self.hand_list) > 0:
-            hand = self.hand_list[0]
+            hand = self.hand_list[hand_id]
             # thumb
             fingers.append(hand[self.tipIds[0]][1] < hand[self.tipIds[0] - 1][1])
             # rest fingers

@@ -39,9 +39,10 @@ menu = PM.Menu(cv2, menu_items, width=SCREEN_WIDTH, height=SCREEN_HEIGHT)
 
 p_time = 0
 
-hand_detector = htm.HandDetector(min_detection_confidence=0.6)
+hand_detector = htm.HandDetector(min_detection_confidence=0.8)
 
 PRIMARY_HAND_ID = 0
+SECONDARY_HAND_ID = 1
 THUMB_TIP = 4
 INDEX_TIP = 8
 MIDDLE_TIP = 12
@@ -49,7 +50,10 @@ RING_TIP = 16
 
 ERASER_THICKNESS = 20
 
-MAX_BRUSH_THICKNESS = 30
+MIN_OPTIMAL_THICKNESS = 15
+MAX_OPTIMAL_THICKNESS = 150
+
+MAX_BRUSH_THICKNESS = 40
 MIN_BRUSH_THICKNESS = 1
 DEFAULT_BRUSH_THICKNESS = 15
 
@@ -100,6 +104,17 @@ while True:
 
                 cv2.circle(img, (cx, cy), 5, yellow if length > 50 else blue, cv2.FILLED)
 
+                if len(positions) == 2:
+                    up_fingers_secondary = hand_detector.fingers_state(hand_id=1)
+                    if up_fingers_secondary[1] and up_fingers_secondary[2] and ~up_fingers_secondary[3]:
+                        thickness = np.interp(length, [MIN_OPTIMAL_THICKNESS, MAX_OPTIMAL_THICKNESS],
+                                              [MIN_BRUSH_THICKNESS, MAX_BRUSH_THICKNESS])
+                        current_brush_thickness = int(thickness)
+                        secondary_hand = positions[SECONDARY_HAND_ID]
+                        secondary_middle_finger_x, secondary_middle_finger_y = secondary_hand[MIDDLE_TIP][1:]
+                        cv2.circle(img, (secondary_middle_finger_x, secondary_middle_finger_y), current_brush_thickness,
+                                   blue, cv2.FILLED)
+
             if selected_menu_item.mode == PM.MenuMode.eraser and up_fingers[1] and up_fingers[2] and up_fingers[3]:
                 # erase mode
                 # menu.select_by_mode(PM.MenuMode.eraser, cv2)
@@ -130,13 +145,13 @@ while True:
             elif selected_menu_item.mode == PM.MenuMode.paint and up_fingers[1]:
                 # draw mode
                 cx, cy = index_finger_x, index_finger_y
-                cv2.circle(img, (cx, cy), 10, drawing_color, cv2.FILLED)
+                cv2.circle(img, (cx, cy), current_brush_thickness, drawing_color, cv2.FILLED)
 
                 if xp == -1 and yp == -1:
                     xp, yp = cx, cy
 
-                cv2.line(img, (xp, yp), (cx, cy), drawing_color,current_brush_thickness)
-                cv2.line(img_canvas, (xp, yp), (cx, cy), drawing_color,current_brush_thickness)
+                cv2.line(img, (xp, yp), (cx, cy), drawing_color, current_brush_thickness)
+                cv2.line(img_canvas, (xp, yp), (cx, cy), drawing_color, current_brush_thickness)
                 xp, yp = cx, cy
 
     img_gray = cv2.cvtColor(img_canvas, cv2.COLOR_BGR2GRAY)
@@ -149,7 +164,7 @@ while True:
     fps = 1 / (c_time - p_time)
     p_time = c_time
 
-    cv2.putText(img, f'FPS: {int(fps)}', (SCREEN_WIDTH - 100, 20), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, c4, 2)
+    # cv2.putText(img, f'FPS: {int(fps)}', (SCREEN_WIDTH - 100, 20), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, c4, 2)
 
     # cv2.putText(img, f'Mode: {selected_menu_item.title}', (SCREEN_WIDTH - 250, 50), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, c4, 2)
 
