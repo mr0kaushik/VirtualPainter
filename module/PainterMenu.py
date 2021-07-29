@@ -6,9 +6,9 @@ import enum
 class MenuMode(enum.Enum):
     paint = 0
     thickness = 1
-    color = 2
-    eraser = 3
-    hand = 4
+    # color = 2
+    eraser = 2
+    hand = 3
 
 
 class Menu:
@@ -75,7 +75,7 @@ class Menu:
     def select_menu_item_if_possible(self, cv2, current_position):
         for idx, item in enumerate(self.menuItems):
             if item.is_inside(current_position):
-                print(f'Selected Index {idx}')
+                # print(f'Selected Index {idx}')
                 self.select(self.selectedMenuItemIndex, cv2)
                 return item
         return self.current_item
@@ -108,7 +108,7 @@ class MenuItem:
         self.hit_box = hit_box  # (top_left_position, bottom_right_position)
         self.size = size
         self.img = cv2.resize(self.img, self.size, interpolation=cv2.INTER_AREA)
-        print(f'Image shape {self.img.shape}')
+        # print(f'Image shape {self.img.shape}')
 
     def is_inside(self, pos):
         x1, y1 = self.hit_box[0]

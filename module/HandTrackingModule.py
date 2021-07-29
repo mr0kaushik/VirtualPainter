@@ -67,6 +67,7 @@ class HandDetector:
 
                 if draw:
                     self.mpDraw.draw_landmarks(img, handLMS, self.mpHands.HAND_CONNECTIONS)
+        self.hand_list.reverse()
         return img, self.hand_list
 
     def fingers_state(self, hand_id=0):
@@ -96,7 +97,7 @@ def main():
         #     print("Complete", positions)
 
         fingers = detector.fingers_state()
-        print(fingers)
+        # print(fingers)
 
         # img, positions = detector.find_hand_with_points(img, points=[3, 4])
         # if len(positions) > 0:
